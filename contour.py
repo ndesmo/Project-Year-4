@@ -3,7 +3,7 @@ from scipy.linalg import eig,svd,norm,schur
 import matplotlib.pyplot as plt
 import scipy.io as sio
 
-mat_contents = sio.loadmat('NLEVP/bicycle.mat')
+mat_contents = sio.loadmat('NLEVP/qep1.mat')
 a0 = mat_contents['a0']
 a1 = mat_contents['a1']
 a2 = mat_contents['a2']
