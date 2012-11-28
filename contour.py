@@ -16,11 +16,12 @@ m = a0.shape[0]
 
 lmin = 1
 
-A = random.rand(m,m) -1/2
+A = random.rand(m,m) -1/2 + (random.rand(m,m) -1/2)*1j
+#lam, vec = eig(A)
+lam = e ; vec = X
 
 N = 5
-R = 10.0
-
+R = 10.
 mu = 0.+0.j
 
 def T(z):
@@ -28,6 +29,9 @@ def T(z):
     #return z*identity(m, dtype=complex)-A
     #return (z**4)*a4+(z**3)*a3+(z**2)*a2+z*a1+a0
     return (z**2)*a2+z*a1+a0
+
+def isincontour(z):
+    return abs(z-mu)<R
 
 for l in range(lmin,m+1):
     
@@ -42,7 +46,11 @@ for l in range(lmin,m+1):
         B = (R/N)*Vhat*exp(1j*t)
         phi = mu + R*exp(1j*t)
         for a in range(l):
-            dA[:,a]=linalg.solve((T(phi)),B[:,a])
+            try:
+                dA[:,a]=linalg.solve((T(phi)),B[:,a])
+            except:
+                print T(phi)
+                print "l:",l,"iteration:",i
         A0 += dA
     
     tolrank = 1e-10
@@ -63,6 +71,8 @@ for i in range(N):
         dA[:,a]=linalg.solve((T(phi)),B[:,a])
     A1 += dA
 
+A1+= mu*A0
+
 V0 = V[:m,:k]       # trim matrices
 W0h = Wh[:k,:l]
 s = s[:k]
@@ -75,20 +85,18 @@ Sinv = diag(1/s)
 B = dot(dot(dot(V0h,A1),W0),Sinv) # calculate B
 
 lambs,svects = eig(B) # calc eigenvalues and vectors of B, and A for comparison
-lambs = lambs - mu
-lam = e ; vec = X
+
 
 print lambs
 
 # are all eigenvalues in the contour?
 failed = False
-tolres = 1e-6
+tolres = 1e-10
 vects = zeros((m,k),dtype=complex)
-deletelist = []
 for a in range(k):
-    if abs(lambs[a]-mu)>=R:
+    # eigenvalue within contour?
+    if not isincontour(lambs[a]):
         failed = True
-        deletelist.append(a)
         print "outside range"
         continue
     else:
@@ -98,18 +106,37 @@ for a in range(k):
         if test>tolres:
             failed = True
             print "norm is",test
-            deletelist.append(a)
 
 
 print failed
-
 print lam
 
 if failed: # if it failed either of the two above checks then schur decompose
 
-    U,Q = schur(B, output='complex') # schur decompose 
+    U,Q = schur(B,output='complex') # schur decompose 
     
+    """
+    print lam
             
     lambs = delete(lambs,deletelist)
     print lambs
+    """
+    
+    print lambs
+    
+    lambs = []
+    deletelist = []
+    toleig = 1e-12
+    for a in range(k):
+        lamb = U[a,a]
+        if isincontour(lamb):
+            lambs.append(lamb)
+        else:
+            deletelist.append(a)
+        
+    U = delete(U,deletelist,0)
     Q = delete(Q,deletelist,1)
+    
+    
+    print lambs
+    
