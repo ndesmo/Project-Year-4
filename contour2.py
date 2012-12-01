@@ -3,7 +3,7 @@ from scipy.linalg import eig,svd,norm,schur
 import matplotlib.pyplot as plt
 import scipy.io as sio
 
-mat_contents = sio.loadmat('NLEVP/qep2.mat')
+mat_contents = sio.loadmat('NLEVP/qep1.mat')
 a0 = mat_contents['a0']
 a1 = mat_contents['a1']
 a2 = mat_contents['a2']
@@ -18,7 +18,7 @@ lmin = 1
 
 A = random.rand(m,m) -1/2
 
-N = 100
+N = 10
 K = 4
 R = 20.
 
@@ -103,7 +103,7 @@ for a in range(k):
     else:
         test = norm(dot(T(lambs[a]),dot(V01,svects[:,a])))
         if test>tolres:
-            failed = True
+            failed = True#
             #print "tolres",test
             break
 
@@ -124,7 +124,7 @@ if failed: # if it failed either of the two above checks then schur decompose
     svects = Q
 
 failed = False
-for a in range(k):
+for a in range(lambs.shape[0]):
     if not isincontour(lambs[a]):
         failed = True
         print "abs",lambs[a]

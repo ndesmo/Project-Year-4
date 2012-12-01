@@ -49,8 +49,7 @@ for l in range(lmin,m+1):
             try:
                 dA[:,a]=linalg.solve((T(phi)),B[:,a])
             except:
-                print T(phi)
-                print "l:",l,"iteration:",i
+                pass
         A0 += dA
     
     tolrank = 1e-10
@@ -101,42 +100,43 @@ for a in range(k):
         continue
     else:
         # satisfies original equation?
-        vects[:,a] = dot(V0,svects[:,a])
-        test = norm(dot(T(lambs[a]),vects[:,a]))
+        test = norm(dot(T(lambs[a]),dot(V0,svects[:,a])))
         if test>tolres:
             failed = True
             print "norm is",test
 
 
 print failed
-print lam
 
 if failed: # if it failed either of the two above checks then schur decompose
 
-    U,Q = schur(B,output='complex') # schur decompose 
+    U,Q = schur(B, output='complex') # schur decompose 
     
-    """
-    print lam
-            
-    lambs = delete(lambs,deletelist)
-    print lambs
-    """
-    
-    print lambs
-    
-    lambs = []
     deletelist = []
-    toleig = 1e-12
     for a in range(k):
-        lamb = U[a,a]
-        if isincontour(lamb):
-            lambs.append(lamb)
-        else:
+        if not isincontour(lambs[a]):
             deletelist.append(a)
-        
+    lambs = delete(lambs,deletelist)
     U = delete(U,deletelist,0)
     Q = delete(Q,deletelist,1)
     
-    
-    print lambs
+    svects = Q
+
+failed = False
+for a in range(lambs.shape[0]):
+    if not isincontour(lambs[a]):
+        failed = True
+        print "abs",lambs[a]
+        #break
+    else:
+        test = norm(dot(T(lambs[a]),dot(V0,svects[:,a])))
+        if test>tolres:
+            failed = True
+        print "tolres",test
+            #break
+        
+print failed
+print lambs
+print lam
+
     
