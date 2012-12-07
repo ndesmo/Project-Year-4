@@ -31,7 +31,37 @@ mu = 0.+0.j
 
 print "N = "+str(N)+" ; K = "+str(K)+" ; R = "+str(R)+" ; mu = "+str(mu)
 
+#lmin = m/K
 
+def comparevectors(test,control,toltest = 1e-20):
+    rows,cols = test.shape
+    crows,ccols = control.shape
+    if rows != crows:
+        return
+    agree = True
+    list = []
+    for f in range(cols):
+        if agree:
+            for j in range(ccols):
+                sd = 0
+                xbar = 0
+                for i in range(rows):
+                    xbar += (1/rows)*test[i,f]/control[i,j]
+                for i in range(rows):
+                    sd += (1/rows)*(test[i,f]/control[i,j]-xbar)**2
+                sd = sqrt(sd)
+                if sd<tolres:
+                    if j not in list:
+                        list.append(j)
+                        break
+                    else:
+                        continue
+                    
+            if sd>tolres:
+                print "vectors disagree"
+                agree = False
+                break
+    if agree: print "vectors agree"
 
 def T(z):
     if a3a4:
@@ -46,6 +76,7 @@ def Phi(t):
     return mu + R*exp(1j*t)
 
 def A(p):
+    # compute A_p
     sparse = False
     A0=zeros([m,l], dtype=complex)
     dA=zeros([m,l], dtype=complex)
@@ -66,13 +97,13 @@ def A(p):
     return A0
         
 def getBs(m,l):
+    # compute the Hankel matrices
     B = zeros([(K+1)*m,(K+1)*l], dtype = complex)
     for i in range(K+1):
         for j in range(K+1):
             B[i*m:(i+1)*m,j*l:(j+1)*l]=A(i+j)
     B0 = B[:(K)*m,:(K)*l]
     B1 = B[m:,l:]
-    
     return B0, B1
 
 for l in range(lmin,m+1):
@@ -110,7 +141,9 @@ lam = e ; vec = X
 failed = False
 sparse = False
 tolres = 1e-6
-vects = zeros((k,k),dtype=complex)
+vects = dot(V01,svects)
+
+#comparevectors(vects,X)
 
 for a in range(k):
     if not isincontour(lambs[a]):
@@ -119,12 +152,12 @@ for a in range(k):
         break
     else:
         if sparse:
-            test = norm(dot(T(lambs[a]).todense(),dot(V01,svects[:,a])))
+            test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
         else:
             try:
-                test = norm(dot(T(lambs[a]),dot(V01,svects[:,a])))
+                test = norm(dot(T(lambs[a]),vects[:,a]))
             except:
-                test = norm(dot(T(lambs[a]).todense(),dot(V01,svects[:,a])))
+                test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
                 sparse = True
         if test>tolres:
             print "Test: invalid solution"
@@ -135,63 +168,69 @@ if failed: # if it failed either of the two above checks then schur decompose
 
     U,Q = schur(D, output='complex') # schur decompose 
     
+    lambs = zeros(k, dtype="complex")
     deletelist = []
     for a in range(k):
+        lambs[a] = sqrt(U[a,a])
         if not isincontour(lambs[a]):
             deletelist.append(a)
-    lambs = sqrt(delete(lambs,deletelist)) 
+    lambs = delete(lambs,deletelist)
     """ NEED TO SORT OUT SQUARING ^ """
     U = delete(U,deletelist,0)
     Q = delete(Q,deletelist,1)
     
     svects = Q
+    vects = dot(V01,svects)
 
-failed = False
-for a in range(lambs.shape[0]):
-    if not isincontour(lambs[a]):
-        failed = True
+if lambs.shape[0] == 0:
+    print "No eigenvalues computed within contour"
+else:
+    failed = False
+    for a in range(lambs.shape[0]):
+        if not isincontour(lambs[a]):
+            failed = True
+        else:
+            if sparse:
+                test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
+            else:
+                try:
+                    test = norm(dot(T(lambs[a]),vects[:,a]))
+                except:
+                    test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
+                    sparse = True
+            if test>tolres:
+                failed = True
+            
+    if failed:
+        print "Some values are incorrect"
     else:
+        print "Values are correct"
+    
+    # error checks
+    # 1. error of the eigenvalues
+    error = 0
+    for i in range(lambs.shape[0]):
+        mindist = 2*R
+        for j in range(lam.shape[0]):
+            # check for nearest eigenvalue, then distance to it
+            dist = abs(lambs[i]-lam[j])
+            if dist<mindist:
+                mindist = dist
+        error += mindist**2
+    error = sqrt(error)/lambs.shape[0]
+    print "Error in eigenvalues is "+str(error[0])
+   
+    # 2. error of solution; is T(lambda)v = 0?
+    verror = 0
+    for a in range(lambs.shape[0]):
         if sparse:
-            test = norm(dot(T(lambs[a]).todense(),dot(V01,svects[:,a])))
+            test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
         else:
             try:
-                test = norm(dot(T(lambs[a]),dot(V01,svects[:,a])))
+                test = norm(dot(T(lambs[a]),vects[:,a]))
             except:
-                test = norm(dot(T(lambs[a]).todense(),dot(V01,svects[:,a])))
+                test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
                 sparse = True
-        if test>tolres:
-            failed = True
-        
-if failed:
-    print "Some values are incorrect"
-else:
-    print "Values are correct"
-
-# error checks
-# 1. error of the eigenvalues
-error = 0
-for i in range(lambs.shape[0]):
-    mindist = 2*R
-    for j in range(lam.shape[0]):
-        # check for nearest eigenvalue, then distance to it
-        dist = abs(lambs[i]-lam[j])
-        if dist<mindist:
-            mindist = dist
-    error += mindist**2
-error = sqrt(error)/lambs.shape[0]
-print "Error in eigenvalues is "+str(error[0])
-
-# 2. error of solution; is T(lambda)v = 0?
-verror = 0
-for a in range(lambs.shape[0]):
-    if sparse:
-        test = norm(dot(T(lambs[a]).todense(),dot(V01,svects[:,a])))
-    else:
-        try:
-            test = norm(dot(T(lambs[a]),dot(V01,svects[:,a])))
-        except:
-            test = norm(dot(T(lambs[a]).todense(),dot(V01,svects[:,a])))
-            sparse = True
-    error += test**2
-error = sqrt(error)/lambs.shape[0]
-print "Error in solution is "+str(error[0])
+        error += test**2
+    error = sqrt(error)/lambs.shape[0]
+    print "Error in solution is "+str(error[0])
