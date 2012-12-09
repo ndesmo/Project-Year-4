@@ -4,7 +4,7 @@ from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 import scipy.io as sio
 
-mat_contents = sio.loadmat('NLEVP/qep2.mat')
+mat_contents = sio.loadmat('NLEVP/mirror.mat')
 a0 = mat_contents['a0']
 a1 = mat_contents['a1']
 a2 = mat_contents['a2']
@@ -22,55 +22,43 @@ X = mat_contents['X']
 m = a0.shape[0]
 print "T is "+str(m)+" x "+str(m)
 
-lmin = m/2
+lmin = m
 
-N = 10
-K = 4
-R = 8.
-mu = 0.+0.j
+N = 8
+R = 10.
+mu = 1.+1.j
+
+def isincontour(z):
+    tolcont = 1e-8
+    return abs(z-mu)<R-tolcont
+
+deletelist = []
+for a in range(e.shape[0]):
+    if not isincontour(e[a]):
+        deletelist.append(a)
+E = delete(e,deletelist)
+
+K = len(E)/m + 1
 
 print "N = "+str(N)+" ; K = "+str(K)+" ; R = "+str(R)+" ; mu = "+str(mu)
 
 #lmin = m/K
 
-def comparevectors(test,control,toltest = 1e-20):
-    rows,cols = test.shape
-    crows,ccols = control.shape
-    if rows != crows:
-        return
-    agree = True
-    list = []
-    for f in range(cols):
-        if agree:
-            for j in range(ccols):
-                sd = 0
-                xbar = 0
-                for i in range(rows):
-                    xbar += (1/rows)*test[i,f]/control[i,j]
-                for i in range(rows):
-                    sd += (1/rows)*(test[i,f]/control[i,j]-xbar)**2
-                sd = sqrt(sd)
-                if sd<tolres:
-                    if j not in list:
-                        list.append(j)
-                        break
-                    else:
-                        continue
-                    
-            if sd>tolres:
-                print "vectors disagree"
-                agree = False
-                break
-    if agree: print "vectors agree"
+
+#roots = array([1+1j,-1j,3j,-5+4j])
 
 def T(z):
+    
     if a3a4:
         return (z**4)*a4+(z**3)*a3+(z**2)*a2+z*a1+a0
     else:
         return (z**2)*a2+z*a1+a0
-
-def isincontour(z):
-    return abs(z-mu)<R
+    """
+    T = identity(m, dtype=complex)
+    for root in roots:
+        T = T*(z-root)
+    return T
+    """
 
 def Phi(t):
     return mu + R*exp(1j*t)
@@ -98,12 +86,15 @@ def A(p):
         
 def getBs(m,l):
     # compute the Hankel matrices
-    B = zeros([(K+1)*m,(K+1)*l], dtype = complex)
-    for i in range(K+1):
-        for j in range(K+1):
-            B[i*m:(i+1)*m,j*l:(j+1)*l]=A(i+j)
-    B0 = B[:(K)*m,:(K)*l]
-    B1 = B[m:,l:]
+    B0 = zeros([K*m,K*l], dtype = complex)
+    B1 = zeros([K*m,K*l], dtype = complex)
+    Alist = []
+    for i in range(2*K):
+        Alist.append(A(i))
+    for i in range(K):
+        for j in range(K):
+            B0[i*m:(i+1)*m,j*l:(j+1)*l]=Alist[i+j]
+            B1[i*m:(i+1)*m,j*l:(j+1)*l]=Alist[i+j+1]
     return B0, B1
 
 for l in range(lmin,m+1):
@@ -143,8 +134,6 @@ sparse = False
 tolres = 1e-6
 vects = dot(V01,svects)
 
-#comparevectors(vects,X)
-
 for a in range(k):
     if not isincontour(lambs[a]):
         failed = True
@@ -171,23 +160,25 @@ if failed: # if it failed either of the two above checks then schur decompose
     lambs = zeros(k, dtype="complex")
     deletelist = []
     for a in range(k):
-        lambs[a] = sqrt(U[a,a])
+        lambs[a] = U[a,a]
         if not isincontour(lambs[a]):
             deletelist.append(a)
     lambs = delete(lambs,deletelist)
-    """ NEED TO SORT OUT SQUARING ^ """
     U = delete(U,deletelist,0)
     Q = delete(Q,deletelist,1)
     
     svects = Q
     vects = dot(V01,svects)
 
+deletelist = []
+
 if lambs.shape[0] == 0:
     print "No eigenvalues computed within contour"
 else:
     failed = False
     for a in range(lambs.shape[0]):
-        if not isincontour(lambs[a]):
+        if not isincontour(lambs[a]):            
+            deletelist.append(a)
             failed = True
         else:
             if sparse:
@@ -199,12 +190,19 @@ else:
                     test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
                     sparse = True
             if test>tolres:
+                deletelist.append(a)
                 failed = True
             
     if failed:
-        print "Some values are incorrect"
+        lambs = delete(lambs,deletelist)
+        vects = delete(vects,deletelist,1)
+        print "Some values were incorrect, deleted"
     else:
         print "Values are correct"
+
+if lambs.shape[0] == 0:
+    print "No eigenvalues computed within contour"
+else:
     
     # error checks
     # 1. error of the eigenvalues
@@ -234,3 +232,7 @@ else:
         error += test**2
     error = sqrt(error)/lambs.shape[0]
     print "Error in solution is "+str(error[0])
+
+
+print "Number of eigenvalues found: "+str(len(lambs))
+print "Total eigenvalues within contour: "+str(len(E))
