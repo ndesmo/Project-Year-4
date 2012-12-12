@@ -2,9 +2,10 @@ from numpy import *
 from scipy.linalg import eig,svd,norm,schur
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
 import scipy.io as sio
 
-mat_contents = sio.loadmat('NLEVP/mirror.mat')
+mat_contents = sio.loadmat('NLEVP/bilby.mat')
 a0 = mat_contents['a0']
 a1 = mat_contents['a1']
 a2 = mat_contents['a2']
@@ -24,8 +25,8 @@ print "T is "+str(m)+" x "+str(m)
 
 lmin = m
 
-N = 8
-R = 10.
+N = 12
+R = 100.
 mu = 1.+1.j
 
 def isincontour(z):
@@ -38,7 +39,7 @@ for a in range(e.shape[0]):
         deletelist.append(a)
 E = delete(e,deletelist)
 
-K = len(E)/m + 1
+K = max(len(E)/m + 1, 2)
 
 print "N = "+str(N)+" ; K = "+str(K)+" ; R = "+str(R)+" ; mu = "+str(mu)
 
@@ -108,7 +109,7 @@ for l in range(lmin,m+1):
     tolrank = 1e-10
     V, s, Wh = svd(B0) # do svd and calculate rank k
     k = sum(s>tolrank)
-    if k!=K*l:
+    if k!=K*l and k!=0:
         break
     
 print "k = "+str(k)
@@ -131,7 +132,7 @@ lam = e ; vec = X
 # are all eigenvalues in the contour?
 failed = False
 sparse = False
-tolres = 1e-6
+tolres = 1e-2
 vects = dot(V01,svects)
 
 for a in range(k):
@@ -155,7 +156,7 @@ for a in range(k):
 
 if failed: # if it failed either of the two above checks then schur decompose
 
-    U,Q = schur(D, output='complex') # schur decompose 
+    U,Q,sdim = schur(D, output='complex', sort=isincontour) # schur decompose 
     
     lambs = zeros(k, dtype="complex")
     deletelist = []
@@ -214,9 +215,13 @@ else:
             dist = abs(lambs[i]-lam[j])
             if dist<mindist:
                 mindist = dist
-        error += mindist**2
-    error = sqrt(error)/lambs.shape[0]
-    print "Error in eigenvalues is "+str(error[0])
+        error += mindist
+    error = error/lambs.shape[0]
+    try:
+        error = error[0]
+    except:
+        pass
+    print "Error in eigenvalues is "+str(error)
    
     # 2. error of solution; is T(lambda)v = 0?
     verror = 0
@@ -229,10 +234,36 @@ else:
             except:
                 test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
                 sparse = True
-        error += test**2
-    error = sqrt(error)/lambs.shape[0]
-    print "Error in solution is "+str(error[0])
+        error += test
+    error = error/lambs.shape[0]
+    try:
+        error = error[0]
+    except:
+        pass
+    print "Error in solution is "+str(error)
 
 
 print "Number of eigenvalues found: "+str(len(lambs))
 print "Total eigenvalues within contour: "+str(len(E))
+
+#PLOT A GRAPH
+
+fig = plt.figure()
+ax1 = fig.add_subplot(111)
+
+x1 = real(lambs)
+y1 = imag(lambs)
+
+x2 = real(lam)
+y2 = imag(lam)
+
+ax1.scatter(x1, y1, marker='o', c = "r")
+ax1.scatter(x2, y2, marker='^', c = "b")
+
+mur = real(mu)
+mui = imag(mu)
+
+ax1.add_artist(Circle((mur,mui),R, fill=False, color='g'))
+
+plt.show()
+
