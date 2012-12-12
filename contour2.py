@@ -4,8 +4,9 @@ from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import scipy.io as sio
+from math import ceil
 
-mat_contents = sio.loadmat('NLEVP/bilby.mat')
+mat_contents = sio.loadmat('NLEVP/butterfly.mat')
 a0 = mat_contents['a0']
 a1 = mat_contents['a1']
 a2 = mat_contents['a2']
@@ -26,8 +27,10 @@ print "T is "+str(m)+" x "+str(m)
 lmin = m
 
 N = 12
-R = 100.
+R = 100
 mu = 1.+1.j
+
+shift = True
 
 def isincontour(z):
     tolcont = 1e-8
@@ -39,7 +42,7 @@ for a in range(e.shape[0]):
         deletelist.append(a)
 E = delete(e,deletelist)
 
-K = max(len(E)/m + 1, 2)
+K = int(max(ceil(float(len(E))/m), 2))
 
 print "N = "+str(N)+" ; K = "+str(K)+" ; R = "+str(R)+" ; mu = "+str(mu)
 
@@ -72,7 +75,10 @@ def A(p):
     for i in range(N):
         t = 2*i*pi/N
         phi = Phi(t)
-        B = (R/N)*Vhat*(phi**p)*exp(1j*t)
+        if shift:
+            B = (R/N)*Vhat*((phi-mu)**p)*exp(1j*t)
+        else:
+            B = (R/N)*Vhat*(phi**p)*exp(1j*t)
         for a in range(l):
             if sparse:
                 dA[:,a]=spsolve(T(phi),B[:,a])
@@ -128,6 +134,7 @@ Sinv = diag(1/s)
 D = dot(dot(dot(V0h,B1),W0),Sinv) # calculate B
 
 lambs,svects = eig(D) # calc eigenvalues and vectors of B, and A for comparison
+if shift: lambs += mu
 lam = e ; vec = X
 # are all eigenvalues in the contour?
 failed = False
@@ -162,6 +169,7 @@ if failed: # if it failed either of the two above checks then schur decompose
     deletelist = []
     for a in range(k):
         lambs[a] = U[a,a]
+        if shift: lambs[a] += mu
         if not isincontour(lambs[a]):
             deletelist.append(a)
     lambs = delete(lambs,deletelist)
@@ -246,24 +254,26 @@ else:
 print "Number of eigenvalues found: "+str(len(lambs))
 print "Total eigenvalues within contour: "+str(len(E))
 
-#PLOT A GRAPH
-
-fig = plt.figure()
-ax1 = fig.add_subplot(111)
-
-x1 = real(lambs)
-y1 = imag(lambs)
-
-x2 = real(lam)
-y2 = imag(lam)
-
-ax1.scatter(x1, y1, marker='o', c = "r")
-ax1.scatter(x2, y2, marker='^', c = "b")
-
-mur = real(mu)
-mui = imag(mu)
-
-ax1.add_artist(Circle((mur,mui),R, fill=False, color='g'))
-
-plt.show()
-
+def scatterplot():
+    """ PLOT A GRAPH """
+    
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111)
+    
+    x1 = real(lambs)
+    y1 = imag(lambs)
+    
+    x2 = real(E)
+    y2 = imag(E)
+    
+    ax1.scatter(x2, y2, marker='o', c = "b")
+    ax1.scatter(x1, y1, marker='^', c = "r")
+    
+    mur = real(mu)
+    mui = imag(mu)
+    
+    ax1.add_artist(Circle((mur,mui),R, fill=False, color='g'))
+    
+    plt.show()
+    
+scatterplot()
