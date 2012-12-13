@@ -7,17 +7,23 @@ import scipy.io as sio
 from math import ceil
 
 mat_contents = sio.loadmat('NLEVP/butterfly.mat')
+
+dim = 2
 a0 = mat_contents['a0']
 a1 = mat_contents['a1']
 a2 = mat_contents['a2']
 try:
     a3 = mat_contents['a3']
-    a4 = mat_contents['a4']
-    print "Quartic eigenvalue problem"
-    a3a4 = True
+    try:
+        a4 = mat_contents['a4']
+        dim = 4
+        print "Quartic eigenvalue problem"
+    except:
+        dim = 3
+        print "Cubic eigenvalue problem"
 except:
     print "Quadratic eigenvalue problem"
-    a3a4 = False
+    
 e = mat_contents['e']
 X = mat_contents['X']
 
@@ -27,7 +33,7 @@ print "T is "+str(m)+" x "+str(m)
 lmin = m
 
 N = 12
-R = 100
+R = 50
 mu = 1.+1.j
 
 shift = True
@@ -53,9 +59,11 @@ print "N = "+str(N)+" ; K = "+str(K)+" ; R = "+str(R)+" ; mu = "+str(mu)
 
 def T(z):
     
-    if a3a4:
+    if dim == 4:
         return (z**4)*a4+(z**3)*a3+(z**2)*a2+z*a1+a0
-    else:
+    if dim == 3:
+        return (z**3)*a3+(z**2)*a2+z*a1+a0
+    if dim == 2:
         return (z**2)*a2+z*a1+a0
     """
     T = identity(m, dtype=complex)
@@ -133,57 +141,64 @@ Sinv = diag(1/s)
 
 D = dot(dot(dot(V0h,B1),W0),Sinv) # calculate B
 
-lambs,svects = eig(D) # calc eigenvalues and vectors of B, and A for comparison
-if shift: lambs += mu
+try:
+    lambs,svects = eig(D) # calc eigenvalues and vectors of B, and A for comparison
+    if shift: lambs += mu
+    failed = False
+except:
+    print "First try: No eigenvalues calculated"
+    lambs = array([]) ; svects = array([])
+    failed = True
 lam = e ; vec = X
 # are all eigenvalues in the contour?
-failed = False
 sparse = False
 tolres = 1e-2
 vects = dot(V01,svects)
 
-for a in range(k):
-    if not isincontour(lambs[a]):
-        failed = True
-        print "Test: not in contour"
-        break
-    else:
-        if sparse:
-            test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
-        else:
-            try:
-                test = norm(dot(T(lambs[a]),vects[:,a]))
-            except:
-                test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
-                sparse = True
-        if test>tolres:
-            print "Test: invalid solution"
+if not failed:
+    for a in range(k):
+        if not isincontour(lambs[a]):
             failed = True
+            print "Test: not in contour"
             break
+        else:
+            if sparse:
+                test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
+            else:
+                try:
+                    test = norm(dot(T(lambs[a]),vects[:,a]))
+                except:
+                    test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
+                    sparse = True
+            if test>tolres:
+                print "Test: invalid solution"
+                failed = True
+                break
 
 if failed: # if it failed either of the two above checks then schur decompose
 
-    U,Q,sdim = schur(D, output='complex', sort=isincontour) # schur decompose 
+    try:
+        U,Q,sdim = schur(D, output='complex', sort=isincontour) # schur decompose
+        lambs = zeros(k, dtype="complex")
+        deletelist = []
+        for a in range(k):
+            lambs[a] = U[a,a]
+            if shift: lambs[a] += mu
+            if not isincontour(lambs[a]):
+                deletelist.append(a)
+        lambs = delete(lambs,deletelist)
+        U = delete(U,deletelist,0)
+        Q = delete(Q,deletelist,1)
+        
+        svects = Q
+        vects = dot(V01,svects) 
+    except:
+        lambs = array([])
     
-    lambs = zeros(k, dtype="complex")
-    deletelist = []
-    for a in range(k):
-        lambs[a] = U[a,a]
-        if shift: lambs[a] += mu
-        if not isincontour(lambs[a]):
-            deletelist.append(a)
-    lambs = delete(lambs,deletelist)
-    U = delete(U,deletelist,0)
-    Q = delete(Q,deletelist,1)
-    
-    svects = Q
-    vects = dot(V01,svects)
 
 deletelist = []
 
-if lambs.shape[0] == 0:
-    print "No eigenvalues computed within contour"
-else:
+if not lambs.shape[0] == 0:
     failed = False
     for a in range(lambs.shape[0]):
         if not isincontour(lambs[a]):            
