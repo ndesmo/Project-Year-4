@@ -6,7 +6,7 @@ from matplotlib.patches import Circle
 import scipy.io as sio
 from math import ceil
 
-mat_contents = sio.loadmat('NLEVP/butterfly.mat')
+mat_contents = sio.loadmat('NLEVP/shaft.mat')
 
 dim = 2
 a0 = mat_contents['a0']
@@ -32,9 +32,9 @@ print "T is "+str(m)+" x "+str(m)
 
 lmin = m
 
-N = 12
-R = 50
-mu = 1.+1.j
+N = 5
+R = 100.
+mu = -1.+1.j
 
 shift = True
 
@@ -51,6 +51,9 @@ E = delete(e,deletelist)
 K = int(max(ceil(float(len(E))/m), 2))
 
 print "N = "+str(N)+" ; K = "+str(K)+" ; R = "+str(R)+" ; mu = "+str(mu)
+
+if shift: print "Shifted" 
+else: print "Not shifted"
 
 #lmin = m/K
 
@@ -277,12 +280,12 @@ def scatterplot():
     
     x1 = real(lambs)
     y1 = imag(lambs)
-    
+
     x2 = real(E)
     y2 = imag(E)
     
-    ax1.scatter(x2, y2, marker='o', c = "b")
-    ax1.scatter(x1, y1, marker='^', c = "r")
+    ax1.scatter(x2, y2, marker='o', lw = 1.5, edgecolors = "r", facecolors = 'w')
+    ax1.scatter(x1, y1, marker='.', c = "b", lw = 0.5, edgecolors = "b")
     
     mur = real(mu)
     mui = imag(mu)
