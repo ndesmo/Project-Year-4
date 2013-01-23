@@ -2,11 +2,12 @@
 
 # Help Python find the bempp module
 import sys
-sys.path.append("..")
+sys.path.append("/home/nick/bempp/python")
 
 from bempp.lib import *
 import numpy as np
 import scipy
+from solveeig import eigSolve
 
 # Load mesh
 
@@ -36,7 +37,7 @@ context = createContext(quadStrategy, assemblyOptions)
 pwiseConstants = createPiecewiseConstantScalarSpace(context, grid)
 pwiseLinears = createPiecewiseLinearContinuousScalarSpace(context, grid)
 
-# Construct elementary operators
+# Construct elementary operators        
 
 
 slpOp = createHelmholtz3dSingleLayerBoundaryOperator(
@@ -53,4 +54,10 @@ def applySingleLayerInverse(k,V):
     slpWeak = slpOp.weakForm().asMatrix()
     return scipy.linalg.solve(slpWeak,V)
 
+Vhat = np.random.rand(2,2)
+k = 4
+VV = applySingleLayerInverse(k,Vhat)
 
+lambs, vects = eigSolve(VV)
+print lambs
+print vects
