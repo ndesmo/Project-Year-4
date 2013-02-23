@@ -1,13 +1,13 @@
 from numpy import *
 from scipy.linalg import eig,svd,norm,schur
 from scipy.sparse.linalg import spsolve
-import scipy as sp
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import scipy.io as sio
 from math import ceil
+import sys
 
-mat_contents = sio.loadmat('NLEVP/qep1.mat')
+mat_contents = sio.loadmat('NLEVP/gen_hyper2.mat')
 
 dim = 2
 a0 = mat_contents['a0']
@@ -31,11 +31,11 @@ X = mat_contents['X']
 m = a0.shape[0]
 print "T is "+str(m)+" x "+str(m)
 
-lmin = m
+l = m
 
 N = 5
-R = 0.5
-mu = 1.+0.j
+R = 100.
+mu = -1.+1.j
 
 shift = True
 
@@ -49,9 +49,11 @@ for a in range(e.shape[0]):
         deletelist.append(a)
 E = delete(e,deletelist)
 
-K = int(max(ceil(float(len(E))/m), 2))
+#Kmin = int(max(ceil(float(len(E))/m), 1))
+Kmin = 1
+Kmax = Kmin + 4
 
-print "N = "+str(N)+" ; K = "+str(K)+" ; R = "+str(R)+" ; mu = "+str(mu)
+print "N = "+str(N)+" ; Kmin = "+str(Kmin)+" ; R = "+str(R)+" ; mu = "+str(mu)
 
 if shift: print "Shifted" 
 else: print "Not shifted"
@@ -116,115 +118,138 @@ def getBs(m,l):
             B1[i*m:(i+1)*m,j*l:(j+1)*l]=Alist[i+j+1]
     return B0, B1
 
-for l in range(lmin,m+1):
+Kmin1 = Kmin ; Kmax1 = Kmax + 1
+complete = False
+reverting = False
+while not complete:
+    for K in range(Kmin1, Kmax1):
+        print "K = "+str(K)
+        
+        Vhat = identity(m, dtype=complex)
     
-    Vhat = identity(m, dtype=complex)
-
-    # contour integration
-    
-    B0, B1 = getBs(m,l)
-    
-    tolrank = 1e-10
-    V, s, Wh = svd(B0) # do svd and calculate rank k
-    k = sum(s>tolrank)
-    if k!=K*l and k!=0:
-        break
-    
-print "k = "+str(k)
-
-
-V0 = V[:K*m,:k] 
-V01 = V[:m,:k]     # trim matrices
-W0h = Wh[:k,:K*l]
-s = s[:k]
-
-V0h = V0.transpose().conj()
-W0 = W0h.transpose().conj()
-
-Sinv = diag(1/s)
-
-D = dot(dot(dot(V0h,B1),W0),Sinv) # calculate B
-
-try:
-    lambs,svects = eig(D) # calc eigenvalues and vectors of B, and A for comparison
-    if shift: lambs += mu
-    failed = False
-except:
-    print "First try: No eigenvalues calculated"
-    lambs = array([]) ; svects = array([])
-    failed = True
-lam = e ; vec = X
-# are all eigenvalues in the contour?
-sparse = False
-tolres = 1e-2
-vects = dot(V01,svects)
-
-if not failed:
-    for a in range(k):
-        if not isincontour(lambs[a]):
-            failed = True
-            print "Test: not in contour"
+        # contour integration
+        
+        B0, B1 = getBs(m,l)
+        
+        tolrank = 1e-10
+        V, s, Wh = svd(B0) # do svd and calculate rank k
+        k = sum(s>tolrank)
+        if k!=K*l and k!=0:
             break
-        else:
-            if sparse:
-                test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
-            else:
-                try:
-                    test = norm(dot(T(lambs[a]),vects[:,a]))
-                except:
-                    test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
-                    sparse = True
-            if test>tolres:
-                print "Test: invalid solution"
+        
+    print "k = "+str(k)
+    
+    
+    V0 = V[:K*m,:k] 
+    V01 = V[:m,:k]     # trim matrices
+    W0h = Wh[:k,:K*l]
+    s = s[:k]
+    
+    V0h = V0.transpose().conj()
+    W0 = W0h.transpose().conj()
+    
+    Sinv = diag(1/s)
+    
+    D = dot(dot(dot(V0h,B1),W0),Sinv) # calculate B
+    
+    try:
+        lambs,svects = eig(D) # calc eigenvalues and vectors of B, and A for comparison
+        if shift: lambs += mu
+        failed = False
+    except:
+        print "First try: No eigenvalues calculated"
+        lambs = array([]) ; svects = array([])
+        failed = True
+    lam = e ; vec = X
+    # are all eigenvalues in the contour?
+    sparse = False
+    tolres = 1e-2
+    vects = dot(V01,svects)
+    
+    if not failed:
+        for a in range(k):
+            if not isincontour(lambs[a]):
                 failed = True
+                print "Test: not in contour"
                 break
-
-if failed: # if it failed either of the two above checks then schur decompose
-
-    U,Q,sdim = schur(D, output='complex', sort=isincontour) # schur decompose
-    lambs = zeros(k, dtype="complex")
-    deletelist = []
-    for a in range(k):
-        lambs[a] = U[a,a]
-        if shift: lambs[a] += mu
-        if not isincontour(lambs[a]):
-            deletelist.append(a)
-    lambs = delete(lambs,deletelist)
-    U = delete(U,deletelist,0)
-    Q = delete(Q,deletelist,1)    
-
-deletelist = []
-
-if not lambs.shape[0] == 0:
-    failed = False
-    for a in range(lambs.shape[0]):
-        if not isincontour(lambs[a]):            
-            deletelist.append(a)
-            failed = True
-        else:
-            if sparse:
-                test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
             else:
-                try:
-                    test = norm(dot(T(lambs[a]),vects[:,a]))
-                except:
+                if sparse:
                     test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
-                    sparse = True
-            if test>tolres:
+                else:
+                    try:
+                        test = norm(dot(T(lambs[a]),vects[:,a]))
+                    except:
+                        test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
+                        sparse = True
+                if test>tolres:
+                    print "Test: invalid solution"
+                    failed = True
+                    break
+    
+    if failed: # if it failed either of the two above checks then schur decompose
+    
+        try:
+            U,Q,sdim = schur(D, output='complex', sort=isincontour) # schur decompose
+            lambs = zeros(k, dtype="complex")
+            deletelist = []
+            for a in range(k):
+                lambs[a] = U[a,a]
+                if shift: lambs[a] += mu
+                if not isincontour(lambs[a]):
+                    deletelist.append(a)
+            lambs = delete(lambs,deletelist)
+            U = delete(U,deletelist,0)
+            Q = delete(Q,deletelist,1)
+            
+            svects = Q
+            vects = dot(V01,svects) 
+        except:
+            lambs = array([])
+        
+    
+    deletelist = []
+    
+    if not lambs.shape[0] == 0:
+        failed = False
+        for a in range(lambs.shape[0]):
+            if not isincontour(lambs[a]):            
                 deletelist.append(a)
                 failed = True
-            
-    if failed:
-        lambs = delete(lambs,deletelist)
-        vects = delete(vects,deletelist,1)
-        print "Some values were incorrect, deleted"
-    else:
-        print "Values are correct"
-
-if lambs.shape[0] == 0:
-    print "No eigenvalues computed within contour"
-else:
+            else:
+                if sparse:
+                    test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
+                else:
+                    try:
+                        test = norm(dot(T(lambs[a]),vects[:,a]))
+                    except:
+                        test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
+                        sparse = True
+                if test>tolres:
+                    deletelist.append(a)
+                    failed = True
+                
+        if failed:
+            lambs = delete(lambs,deletelist)
+            vects = delete(vects,deletelist,1)
+            print "Some values were incorrect, deleted"
+        else:
+            print "Values are correct"
     
+    if lambs.shape[0] == 0:
+        if K != Kmin:
+            print "No eigenvalues computed within contour, reverting"
+            Kmin1 = K-1
+            Kmax1 = K
+        if K == Kmin:
+            if reverting or K == Kmax:
+                print "No eigenvalues computed, aborting"
+                sys.exit()
+            else:
+                Kmin1 = K+1
+    else:
+        complete = True
+    
+if complete:    
     # error checks
     # 1. error of the eigenvalues
     error = 0
@@ -263,8 +288,8 @@ else:
     print "Error in solution is "+str(error)
 
 
-print "Number of eigenvalues found: "+str(len(lambs))
-print "Total eigenvalues within contour: "+str(len(E))
+    print "Number of eigenvalues found: "+str(len(lambs))
+    print "Total eigenvalues within contour: "+str(len(E))
 
 def scatterplot():
     """ PLOT A GRAPH """

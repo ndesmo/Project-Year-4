@@ -3,11 +3,12 @@ from scipy.linalg import eig,svd,norm,schur
 from scipy.sparse.linalg import spsolve
 import scipy as sp
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
+from matplotlib.patches import Polygon
 import scipy.io as sio
 from math import ceil
+from scipy.special import cotdg
 
-mat_contents = sio.loadmat('NLEVP/qep1.mat')
+mat_contents = sio.loadmat('NLEVP/butterfly.mat')
 
 dim = 2
 a0 = mat_contents['a0']
@@ -31,17 +32,29 @@ X = mat_contents['X']
 m = a0.shape[0]
 print "T is "+str(m)+" x "+str(m)
 
-lmin = m
+l = m
 
-N = 5
-R = 0.5
-mu = 1.+0.j
+N = 12
+R = 0.4
+mu = 0.+0.j
+
 
 shift = True
+ang = 180.
+rad = ang*2*pi/360
+
+def r(t):
+    return (3+cos(2*(t+rad)))*R
+    #return (exp(2*cos(t+rad))+1)*R
+
+def rdash(t):
+    return (-2*sin(2*(t+rad)))*R
+    #return (-sin(2*(t+rad))*exp(2*cos(t+rad)))*R
 
 def isincontour(z):
     tolcont = 1e-8
-    return abs(z-mu)<R-tolcont
+    #return abs(z-mu)<R-tolcont
+    return abs(z-mu)<r(angle(z-mu)) - tolcont
 
 deletelist = []
 for a in range(e.shape[0]):
@@ -49,9 +62,10 @@ for a in range(e.shape[0]):
         deletelist.append(a)
 E = delete(e,deletelist)
 
-K = int(max(ceil(float(len(E))/m), 2))
+Kmin = int(max(ceil(float(len(E))/m), 2))
+Kmax = Kmin+1
 
-print "N = "+str(N)+" ; K = "+str(K)+" ; R = "+str(R)+" ; mu = "+str(mu)
+print "N = "+str(N)+" ; Kmin = "+str(Kmin)+" ; Kmax: "+str(Kmax)+" ; R = "+str(R)+" ; mu = "+str(mu)
 
 if shift: print "Shifted" 
 else: print "Not shifted"
@@ -77,7 +91,12 @@ def T(z):
     """
 
 def Phi(t):
-    return mu + R*exp(1j*t)
+    #return mu + R*exp(1j*t)
+    return mu + r(t)*exp(1j*t)
+
+def PhiDash(t):
+    return (rdash(t)+1j*r(t))*exp(1j*t)
+    
 
 def A(p):
     # compute A_p
@@ -87,10 +106,11 @@ def A(p):
     for i in range(N):
         t = 2*i*pi/N
         phi = Phi(t)
+        phidash = PhiDash(t)
         if shift:
-            B = (R/N)*Vhat*((phi-mu)**p)*exp(1j*t)
+            B = (1/(N*1j))*Vhat*((phi-mu)**p)*phidash
         else:
-            B = (R/N)*Vhat*(phi**p)*exp(1j*t)
+            B = (1/(N*1j))*Vhat*(phi**p)*phidash
         for a in range(l):
             if sparse:
                 dA[:,a]=spsolve(T(phi),B[:,a])
@@ -116,7 +136,7 @@ def getBs(m,l):
             B1[i*m:(i+1)*m,j*l:(j+1)*l]=Alist[i+j+1]
     return B0, B1
 
-for l in range(lmin,m+1):
+for K in range(Kmin,Kmax):
     
     Vhat = identity(m, dtype=complex)
 
@@ -156,28 +176,110 @@ except:
 lam = e ; vec = X
 # are all eigenvalues in the contour?
 sparse = False
-tolres = 1e-2
+tolres = 1e-10
 vects = dot(V01,svects)
+
+deletelist = []
 
 if not failed:
     for a in range(k):
         if not isincontour(lambs[a]):
-            failed = True
-            print "Test: not in contour"
-            break
+            deletelist.append(a)
+    
+    lambs = delete(lambs, deletelist)
+    vects = delete(vects, deletelist, 1)
+    
+    for a in range(len(lambs)):
+        if sparse:
+            test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
         else:
-            if sparse:
+            try:
+                test = norm(dot(T(lambs[a]),vects[:,a]))
+            except:
                 test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
-            else:
-                try:
-                    test = norm(dot(T(lambs[a]),vects[:,a]))
-                except:
-                    test = norm(dot(T(lambs[a]).todense(),vects[:,a]))
-                    sparse = True
-            if test>tolres:
-                print "Test: invalid solution"
-                failed = True
+                sparse = True
+        if test>tolres:
+            print "Test: invalid solution"
+            failed = True
+            break
+
+def inviteration(A, lambs, S, tol = 1e-8):
+    n = 20
+    m = A.shape[0]
+    k = S.shape[1]
+    for j in range(k):
+        l = lambs[j]
+        s = S[:,j]
+        F = (A-l*identity(m))
+        for i in range(n):
+            v = linalg.solve(F, s)
+            s1 = v / norm(v, ord=inf)
+            if norm(s1-s, ord=inf)<tol:
                 break
+            s = s1
+        S[:,j] = s1
+    return S
+
+def partition(T, tol = 1e-8):
+    n = T.shape[0]
+    l = 0.
+    p = 1
+    P = []
+    for i in range(n):
+        l1 = T[i,i]
+        if abs(l1-l)<tol:
+            p += 1
+        else:
+            P.append(p)
+            p = 1
+    return P
+
+def bartels_stewart(F, G, C):
+    p = C.shape[0] ; r = C.shape[1]
+    Z = C
+    for k in range(r):
+        b = c[:,k]
+        for s in range(p):
+            for i in range(k-1):
+                b[s] += G[i,k]*C[s,i]
+        #b = c[:,k] + dot(C, G[:,k])
+        A = F - g[k,k]*identity(p)
+        z = linalg.solve(F, b)
+        Z[:,k] = z
+    return Z
+
+def golub_schur(Q, T):
+    P = partition(T)
+    q = len(P)
+    jsum = 0
+    for j in range(1,q):
+        isum = 0
+        for i in range(j-1):
+            jmin = jsum ; jmax = jsum + P[j]
+            imin = isum ; imax = isum + P[i]
+            Tii = T[imin:imin, imax:imax]
+            Tjj = T[jmin:jmin, jmax:jmax]
+            Tij = T[imin:imin, jmax:jmax]
+            Z = bartels_stewart(Tii, Tjj, -Tij)
+            ksum = 0
+            for k in range(j,q):
+                kmin = ksum ; kmax = ksum + P[k]
+                Tik = T[imin:imin, kmax:kmax]
+                Tjk = T[jmin:jmin, kmax:kmax]
+                T[imin:imin, kmax:kmax] = Tik - dot(Z, Tjk)
+                ksum += P[k]
+            ksum = 0
+            for k in range(j,q):
+                kmin = ksum ; kmax = ksum + P[k]
+                Qki = Q[kmin:kmin, imax:imax]
+                Qkj = Q[kmin:kmin, jmax:jmax]
+                Q[kmin:kmin, jmax:jmax] = dot(Z, Qki) - Qkj
+                ksum += P[k]
+            isum += P[i]
+        jsum += P[j]
+        
+    return Q
+        
 
 if failed: # if it failed either of the two above checks then schur decompose
 
@@ -191,7 +293,21 @@ if failed: # if it failed either of the two above checks then schur decompose
             deletelist.append(a)
     lambs = delete(lambs,deletelist)
     U = delete(U,deletelist,0)
-    Q = delete(Q,deletelist,1)    
+    U = delete(U,deletelist,1)
+    #Q = delete(Q,deletelist,0)
+    Q = delete(Q,deletelist,1)
+    QH = zeros((k,k), dtype=complex)
+    QH[:len(lambs),:len(lambs)]
+    
+    
+    if len(lambs) <= k/4:
+        print "Using inverse iteration"
+        svects = inviteration(D, lambs, Q)
+    else:
+        print "Using Golub algorithm 7.6-3"
+        svects = dot(QH, golub_schur(Q, U))
+    
+    vects = dot(V01,svects)
 
 deletelist = []
 
@@ -284,7 +400,14 @@ def scatterplot():
     mur = real(mu)
     mui = imag(mu)
     
-    ax1.add_artist(Circle((mur,mui),R, fill=False, color='g'))
+    pts = arange(N)*2*pi/N
+    Z = mu + r(pts)*exp(1j*pts)
+    X1 = real(Z) ; Y1 = imag(Z)
+    XY = zeros((N,2))
+    XY[:,0] = X1 ; XY[:,1] = Y1
+    ax1.add_artist(Polygon(XY, fill=False, color='g'))
+    plt.xlim(min(X1), max(X1))
+    plt.ylim(min(Y1), max(Y1))
     
     plt.legend()
     

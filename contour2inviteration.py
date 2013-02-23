@@ -34,7 +34,7 @@ print "T is "+str(m)+" x "+str(m)
 lmin = m
 
 N = 5
-R = 0.5
+R = 1.
 mu = 1.+0.j
 
 shift = True
@@ -179,6 +179,17 @@ if not failed:
                 failed = True
                 break
 
+def inverse_iteration(A, l, tolerance):
+    n = A.shape[0]
+    x = ones(n)
+    Ashift = A - l*identity(n)
+    error = tolerance + 1
+    while error > tolerance:
+        x = sp.linalg.solve(Ashift, x)
+        x = x / sp.linalg.norm(x)
+        error = sp.linalg.norm(l*x - dot(A, x))
+    return x
+
 if failed: # if it failed either of the two above checks then schur decompose
 
     U,Q,sdim = schur(D, output='complex', sort=isincontour) # schur decompose
@@ -191,13 +202,23 @@ if failed: # if it failed either of the two above checks then schur decompose
             deletelist.append(a)
     lambs = delete(lambs,deletelist)
     U = delete(U,deletelist,0)
-    Q = delete(Q,deletelist,1)    
+    R = delete(Q,deletelist,1)
+    
+    P = zeros((k,len(lambs)), dtype = complex)
+    for i in range(len(lambs)):
+        P[:,i] = inverse_iteration(Q, lambs[i], 1e-)
+    print P
+    
+    svects = P
+    vects = dot(V01,svects)
+    
 
 deletelist = []
 
 if not lambs.shape[0] == 0:
     failed = False
     for a in range(lambs.shape[0]):
+        print lambs
         if not isincontour(lambs[a]):            
             deletelist.append(a)
             failed = True

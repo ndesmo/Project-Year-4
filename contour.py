@@ -135,8 +135,5 @@ for a in range(lambs.shape[0]):
         print "tolres",test
             #break
         
-print failed
-print lambs
-print lam
-
-    
+print "Eigenvalues calculated are "
+print lambs  
