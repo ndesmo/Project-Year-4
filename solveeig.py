@@ -1,9 +1,9 @@
 from numpy import *
 from scipy.linalg import eig,svd,norm,schur
     
-def eigSolve(VV, K=4, N=6, R=100., mu=-1.-1.j, shift=True):
+def eigSolve(VV, K=4, N=6, R=100., mu=-1.-1.j):
     
-    m = VV.shape[0]
+    m = pwiseConstants.globalDofCount()
     
     
     lmin = m
@@ -22,11 +22,8 @@ def eigSolve(VV, K=4, N=6, R=100., mu=-1.-1.j, shift=True):
         dA=zeros([m,l], dtype=complex)
         for i in range(N):
             t = 2*i*pi/N
-            phi = Phi(t)
-            if shift:
-                dA = (R/N)*VV*((phi-mu)**p)*exp(1j*t)
-            else:
-                dA = (R/N)*VV*(phi**p)*exp(1j*t)
+            z = Phi(t)
+            dA = (R/N)*exp(1j*t)*(z**p)*VV(z,Vhat)
             A0 += dA
         return A0
             
