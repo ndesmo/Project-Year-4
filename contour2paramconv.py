@@ -8,7 +8,7 @@ import scipy.io as sio
 from math import ceil
 from scipy.special import cotdg
 
-mat_contents = sio.loadmat('NLEVP/butterfly.mat')
+mat_contents = sio.loadmat('NLEVP/mirror.mat')
 
 dim = 2
 a0 = mat_contents['a0']
@@ -33,8 +33,8 @@ m = a0.shape[0]
 print "T is "+str(m)+" x "+str(m)
 
 l = m
-Nmin = 5
-Nmax = 14
+Nmin = 1
+Nmax = 10
 Nstep = 1
 
 Nrange = range(Nmin, Nmax+1, Nstep)
@@ -68,8 +68,8 @@ for a in range(e.shape[0]):
         deletelist.append(a)
 E = delete(e,deletelist)
 
-Kmin = int(max(ceil(float(len(E))/m), 2))
-Kmax = Kmin+1
+Kmin = int(max(ceil(float(len(E))/m), 2))+1
+Kmax = Kmin+5
 
 #lmin = m/K
 

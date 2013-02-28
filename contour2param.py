@@ -34,25 +34,25 @@ print "T is "+str(m)+" x "+str(m)
 
 l = m
 
-N = 12
-R = 0.4
+N = 100
+R = 1.0
 mu = 0.+0.j
 
 
 shift = True
-ang = 180.
+ang = 0.
 rad = ang*2*pi/360
 
 def r(t):
-    return (3+cos(2*(t+rad)))*R
+    return (1+0.3*cos(5*(t+rad)))*R
     #return (exp(2*cos(t+rad))+1)*R
 
 def rdash(t):
-    return (-2*sin(2*(t+rad)))*R
+    return (-1.5*sin(5*(t+rad)))*R
     #return (-sin(2*(t+rad))*exp(2*cos(t+rad)))*R
 
 def isincontour(z):
-    tolcont = 1e-8
+    tolcont = 1e-6
     #return abs(z-mu)<R-tolcont
     return abs(z-mu)<r(angle(z-mu)) - tolcont
 
@@ -62,7 +62,7 @@ for a in range(e.shape[0]):
         deletelist.append(a)
 E = delete(e,deletelist)
 
-Kmin = int(max(ceil(float(len(E))/m), 2))
+Kmin = int(max(ceil(float(len(E))/m), 2))+1
 Kmax = Kmin+1
 
 print "N = "+str(N)+" ; Kmin = "+str(Kmin)+" ; Kmax: "+str(Kmax)+" ; R = "+str(R)+" ; mu = "+str(mu)
@@ -136,6 +136,7 @@ def getBs(m,l):
             B1[i*m:(i+1)*m,j*l:(j+1)*l]=Alist[i+j+1]
     return B0, B1
 
+print "Computing contour integrals"
 for K in range(Kmin,Kmax):
     
     Vhat = identity(m, dtype=complex)
@@ -150,7 +151,7 @@ for K in range(Kmin,Kmax):
     if k!=K*l and k!=0:
         break
     
-print "k = "+str(k)
+print "k = "+str(k)+" ; K = "+str(K)
 
 
 V0 = V[:K*m,:k] 
