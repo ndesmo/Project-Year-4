@@ -3,11 +3,15 @@ from numpy.linalg import inv, eig, norm
 from scipy.linalg import qr
 n = 10
 
+# Initial matrices
 A = 0.9*np.random.rand(n,n)
 I = np.identity(n)
 Inn = I[:,n-1]
 InnT = Inn.transpose()
+
+# set tolerance
 toleig = 1e-1
+# find eigenvalues to compare
 L,V = eig(A)
 
 tol = 1e-3
@@ -39,6 +43,8 @@ C = np.zeros((pts,pts))
 total = pts*pts
 current = 0.
 
+""" iterate over grid """
+
 a = 0
 for x in X:
     b = 0
@@ -46,10 +52,9 @@ for x in X:
 	nl = x + 1j*y
 	l = nl + 1.
 
-
-
 	i = 0
 
+    """ perform QR algorithm """
 	while i<N:
     	    if converged(nl,l): break
    	    try:
@@ -61,6 +66,7 @@ for x in X:
         	break
             i += 1
     
+    # Colour regions according to closest eigenvalue
 	k = 0
 	for LL in L:
 	    k += 1
@@ -75,6 +81,7 @@ for x in X:
     a += 1
 
 import matplotlib.pyplot as plt
+# Plot a graph
 plt.pcolor(X,Y,C.transpose())
 plt.colorbar()
 J = np.zeros((n+1), dtype = "complex")
